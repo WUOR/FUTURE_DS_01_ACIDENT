@@ -1,0 +1,47 @@
+=== Power BI Configuration Script ===
+
+// Power Query M Code for Data Import
+let
+    Source = Csv.Document(File.Contents("..\data\accident_data.csv"),[Delimiter=",", Columns=10, Encoding=65001, QuoteStyle=QuoteStyle.None]),
+    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    #"Changed Type" = Table.TransformColumnTypes(#"Promoted Headers",{
+        {"AccidentID", Int64.Type},
+        {"Date", type date},
+        {"Location", type text},
+        {"Latitude", type number},
+        {"Longitude", type number},
+        {"Severity", Int64.Type},
+        {"Cause", type text},
+        {"Injuries", Int64.Type},
+        {"Fatalities", Int64.Type},
+        {"WeatherConditions", type text}
+    })
+in
+    #"Changed Type"
+
+// DAX Measures for Dashboard
+SeverityScore = 
+SUMX(
+    'Accidents',
+    'Accidents'[Injuries] + ('Accidents'[Fatalities] * 3)
+)
+
+RiskScore = 
+CALCULATE(
+    [SeverityScore] * COUNTROWS('Accidents')^0.5,
+    ALLEXCEPT('Accidents', 'Accidents'[Location])
+)
+
+MonthlyAccidentTrend = 
+VAR CurrentDate = MAX('Accidents'[Date])
+VAR PriorDate = EDATE(CurrentDate, -12)
+RETURN
+CALCULATE(
+    COUNTROWS('Accidents'),
+    DATESBETWEEN('Accidents'[Date], PriorDate, CurrentDate)
+)
+
+// Map Visualization Configuration
+- Use Latitude/Longitude for map coordinates
+- Set color gradient based on SeverityScore
+- Add tooltips showing: Location, Severity, Cause
